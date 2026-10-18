@@ -20,8 +20,9 @@ class TransactionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isIncome = transaction.type.isIncome;
-    final color = isIncome ? const Color(0xFF0D9488) : const Color(0xFFE11D48);
+    final color = isIncome ? theme.colorScheme.primary : const Color(0xFFE11D48);
     final iconName = category?.icon ?? 'category';
     final categoryName = category?.name ?? 'Tanpa Kategori';
 
@@ -41,14 +42,14 @@ class TransactionItem extends StatelessWidget {
         if (onDelete != null) {
           onDelete!();
         }
-        return false; // Let the confirmation dialog handle actual deletion
+        return false;
       },
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardTheme.color ?? theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade100),
+          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.1)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.02),
@@ -63,7 +64,7 @@ class TransactionItem extends StatelessWidget {
           leading: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
@@ -74,9 +75,10 @@ class TransactionItem extends StatelessWidget {
           ),
           title: Text(
             transaction.title,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 15,
+              color: theme.colorScheme.onSurface,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

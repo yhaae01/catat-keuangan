@@ -165,16 +165,16 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
 
             // Segmented Type Selector (Pengeluaran / Pemasukan)
             SegmentedButton<TransactionType>(
-              segments: const [
-                ButtonSegment(
+              segments: [
+                const ButtonSegment(
                   value: TransactionType.expense,
                   label: Text('Pengeluaran'),
                   icon: Icon(Icons.arrow_upward_rounded, color: Colors.red),
                 ),
                 ButtonSegment(
                   value: TransactionType.income,
-                  label: Text('Pemasukan'),
-                  icon: Icon(Icons.arrow_downward_rounded, color: Colors.teal),
+                  label: const Text('Pemasukan'),
+                  icon: Icon(Icons.arrow_downward_rounded, color: Theme.of(context).colorScheme.primary),
                 ),
               ],
               selected: {_selectedType},
@@ -240,7 +240,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                       Icon(
                         CategoryIconHelper.getIcon(cat.icon),
                         size: 20,
-                        color: _selectedType.isIncome ? Colors.teal : Colors.red,
+                        color: _selectedType.isIncome ? Theme.of(context).colorScheme.primary : Colors.red,
                       ),
                       const SizedBox(width: 10),
                       Text(cat.name),
@@ -283,7 +283,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _selectedType.isIncome
-                      ? const Color(0xFF0F766E)
+                      ? Theme.of(context).colorScheme.primary
                       : const Color(0xFFBE123C),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(

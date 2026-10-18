@@ -15,7 +15,15 @@ class BalanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
     final isNegative = balance < 0;
+
+    // Menghasilkan warna gradasi kedua yang selaras dengan primary color tema
+    final hsl = HSLColor.fromColor(primary);
+    final secondaryGradientColor = hsl
+        .withLightness((hsl.lightness + (theme.brightness == Brightness.dark ? 0.08 : 0.12)).clamp(0.0, 1.0))
+        .toColor();
 
     return Container(
       width: double.infinity,
@@ -24,15 +32,14 @@ class BalanceCard extends StatelessWidget {
         gradient: LinearGradient(
           colors: isNegative
               ? [const Color(0xFFC62828), const Color(0xFFE53935)]
-              : [const Color(0xFF0F766E), const Color(0xFF14B8A6)],
+              : [primary, secondaryGradientColor],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: (isNegative ? Colors.red : const Color(0xFF0F766E))
-                .withValues(alpha: 0.3),
+            color: (isNegative ? Colors.red : primary).withValues(alpha: 0.35),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),

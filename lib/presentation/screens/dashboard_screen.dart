@@ -7,6 +7,7 @@ import '../../data/models/transaction_model.dart';
 import '../../data/services/receipt_scanner_service.dart';
 import '../../logic/providers/category_provider.dart';
 import '../../logic/providers/transaction_provider.dart';
+import '../../theme_provider.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/transaction_form_sheet.dart';
 import '../widgets/transaction_item.dart';
@@ -34,7 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -50,6 +51,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Proses pemindaian struk via Kamera atau Galeri
   Future<void> _handleScanReceipt(ImageSource source) async {
     final categoryProvider = context.read<CategoryProvider>();
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     try {
       setState(() => _isScanning = true);
@@ -87,7 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Kategori "${result.category.name}" otomatis dibuat dari analisis struk!'),
-            backgroundColor: Colors.teal.shade700,
+            backgroundColor: primaryColor,
           ),
         );
       }
@@ -112,9 +114,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   /// Modal pilihan aksi FAB (Manual, Kamera, Galeri)
   void _showAddOptionsModal() {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.cardTheme.color ?? theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -140,10 +145,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Opsi 1: Input Manual
+                // Opsi 1: Input Manual (Menggunakan Primary Theme Color)
                 _buildActionTile(
                   icon: Icons.edit_note_rounded,
-                  color: const Color(0xFF0F766E),
+                  color: primary,
                   title: 'Input Transaksi Manual',
                   subtitle: 'Ketik nominal, keterangan, dan pilih kategori',
                   onTap: () {
@@ -198,16 +203,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
+                color: color.withValues(alpha: 0.18),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 22),
@@ -268,14 +273,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Memastikan DashboardScreen re-render seketika saat ThemeProvider diperbarui
+    context.watch<ThemeProvider>();
     final txProvider = context.watch<TransactionProvider>();
     final catProvider = context.watch<CategoryProvider>();
 
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -287,12 +294,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const Text(
+            Text(
               'Catat Keuangan',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ],
@@ -302,13 +309,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardTheme.color ?? Colors.white,
+              color: theme.cardTheme.color ?? theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
             ),
             child: IconButton(
               tooltip: 'Kelola Kategori',
-              icon: Icon(Icons.category_rounded, color: Theme.of(context).colorScheme.primary),
+              icon: Icon(Icons.category_rounded, color: primary),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -321,13 +328,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             margin: const EdgeInsets.only(right: 16),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardTheme.color ?? Colors.white,
+              color: theme.cardTheme.color ?? theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
             ),
             child: IconButton(
               tooltip: 'Pengaturan',
-              icon: Icon(Icons.settings_rounded, color: Theme.of(context).colorScheme.primary),
+              icon: Icon(Icons.settings_rounded, color: primary),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -350,131 +357,131 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: CustomScrollView(
                     slivers: [
                       if (_isScanning)
-                        const SliverToBoxAdapter(
+                        SliverToBoxAdapter(
                           child: LinearProgressIndicator(
-                            color: Color(0xFF0F766E),
-                            backgroundColor: Color(0xFFCCFBF1),
+                            color: primary,
+                            backgroundColor: primary.withValues(alpha: 0.2),
                           ),
                         ),
-                  // Balance Card Section
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      child: BalanceCard(
-                        balance: txProvider.totalBalance,
-                        income: txProvider.totalIncome,
-                        expense: txProvider.totalExpense,
+                      // Balance Card Section
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          child: BalanceCard(
+                            balance: txProvider.totalBalance,
+                            income: txProvider.totalIncome,
+                            expense: txProvider.totalExpense,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
 
-                  // Header Riwayat Transaksi
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Transaksi Terakhir',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${txProvider.transactions.length} Transaksi',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700,
+                      // Header Riwayat Transaksi
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Transaksi Terakhir',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
                               ),
-                            ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${txProvider.transactions.length} Transaksi',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: primary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
 
-                  // Daftar Transaksi atau Tampilan Kosong
-                  if (txProvider.transactions.isEmpty)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0F766E).withValues(alpha: 0.08),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.receipt_long_rounded,
-                                size: 54,
-                                color: Color(0xFF0F766E),
-                              ),
+                      // Daftar Transaksi atau Tampilan Kosong
+                      if (txProvider.transactions.isEmpty)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: BoxDecoration(
+                                    color: primary.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.receipt_long_rounded,
+                                    size: 54,
+                                    color: primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Belum ada transaksi',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Tekan tombol + di bawah untuk mencatat\nmanual atau scan struk belanja Anda',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Belum ada transaksi',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF334155),
-                              ),
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final tx = txProvider.transactions[index];
+                                final category = catProvider.getCategoryById(tx.categoryId);
+                                return TransactionItem(
+                                  transaction: tx,
+                                  category: category,
+                                  onTap: () => _openTransactionForm(transactionToEdit: tx),
+                                  onDelete: () => _confirmDeleteTransaction(context, tx),
+                                );
+                              },
+                              childCount: txProvider.transactions.length,
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Tekan tombol + di bawah untuk mencatat\nmanual atau scan struk belanja Anda',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: 80),
                       ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final tx = txProvider.transactions[index];
-                            final category = catProvider.getCategoryById(tx.categoryId);
-                            return TransactionItem(
-                              transaction: tx,
-                              category: category,
-                              onTap: () => _openTransactionForm(transactionToEdit: tx),
-                              onDelete: () => _confirmDeleteTransaction(context, tx),
-                            );
-                          },
-                          childCount: txProvider.transactions.length,
-                        ),
-                      ),
-                    ),
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 80),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF0F766E),
-        foregroundColor: Colors.white,
+        backgroundColor: primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         elevation: 4,
         onPressed: _showAddOptionsModal,
         icon: const Icon(Icons.add_rounded),

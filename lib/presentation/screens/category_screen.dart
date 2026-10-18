@@ -298,7 +298,7 @@ class _CategoryScreenState extends State<CategoryScreen>
             controller: _tabController,
             children: [
               _buildCategoryList(context, provider.expenseCategories, Colors.red.shade400),
-              _buildCategoryList(context, provider.incomeCategories, Colors.green.shade500),
+              _buildCategoryList(context, provider.incomeCategories, Theme.of(context).colorScheme.primary),
             ],
           );
         },

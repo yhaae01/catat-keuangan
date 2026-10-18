@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+
 import 'core/constants/hive_constants.dart';
 
 class ThemeProvider extends ChangeNotifier {
@@ -11,6 +12,7 @@ class ThemeProvider extends ChangeNotifier {
     'Blue': Color(0xFF2563EB),
     'Purple': Color(0xFF7C3AED),
     'Amber': Color(0xFFD97706),
+    'Pink': Color(0xFFEC4899), // Pink spesial buat istri 💕
   };
 
   bool _isDarkMode = false;
@@ -23,7 +25,8 @@ class ThemeProvider extends ChangeNotifier {
 
   bool get isDarkMode => _isDarkMode;
   String get selectedColorName => _selectedColorName;
-  Color get primaryColor => themeColors[_selectedColorName] ?? const Color(0xFF0F766E);
+  Color get primaryColor =>
+      themeColors[_selectedColorName] ?? const Color(0xFF0F766E);
 
   ThemeMode get themeMode => _isDarkMode ? ThemeMode.dark : ThemeMode.light;
 
@@ -37,7 +40,8 @@ class ThemeProvider extends ChangeNotifier {
       _settingsBox = Hive.box(HiveConstants.settingsBox);
     }
     _isDarkMode = _settingsBox.get(_isDarkModeKey, defaultValue: false) as bool;
-    _selectedColorName = _settingsBox.get(_themeColorKey, defaultValue: 'Emerald') as String;
+    _selectedColorName =
+        _settingsBox.get(_themeColorKey, defaultValue: 'Emerald') as String;
     if (!themeColors.containsKey(_selectedColorName)) {
       _selectedColorName = 'Emerald';
     }
@@ -50,7 +54,7 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Mengubah warna aksen tema (Emerald, Blue, Purple, Amber)
+  /// Mengubah warna aksen tema (Emerald, Blue, Purple, Amber, Pink)
   Future<void> setThemeColor(String colorName) async {
     if (themeColors.containsKey(colorName)) {
       _selectedColorName = colorName;
@@ -71,6 +75,10 @@ class ThemeProvider extends ChangeNotifier {
         primary: seed,
         brightness: Brightness.light,
         surface: Colors.white,
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: seed,
+        foregroundColor: Colors.white,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFFF8FAFC),
@@ -106,6 +114,10 @@ class ThemeProvider extends ChangeNotifier {
         primary: seed,
         brightness: Brightness.dark,
         surface: const Color(0xFF1E293B),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: seed,
+        foregroundColor: Colors.white,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF0F172A),
