@@ -11,6 +11,7 @@ import '../widgets/balance_card.dart';
 import '../widgets/transaction_form_sheet.dart';
 import '../widgets/transaction_item.dart';
 import 'category_screen.dart';
+import '../../settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -299,19 +300,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           // Tombol Kelola Kategori
           Container(
-            margin: const EdgeInsets.only(right: 16),
+            margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardTheme.color ?? Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
             ),
             child: IconButton(
               tooltip: 'Kelola Kategori',
-              icon: const Icon(Icons.category_rounded, color: Color(0xFF0F766E)),
+              icon: Icon(Icons.category_rounded, color: Theme.of(context).colorScheme.primary),
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const CategoryScreen()),
+                );
+              },
+            ),
+          ),
+          // Tombol Pengaturan
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardTheme.color ?? Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+            ),
+            child: IconButton(
+              tooltip: 'Pengaturan',
+              icon: Icon(Icons.settings_rounded, color: Theme.of(context).colorScheme.primary),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 );
               },
             ),

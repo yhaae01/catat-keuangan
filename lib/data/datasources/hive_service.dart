@@ -42,9 +42,10 @@ class HiveService {
       Hive.registerAdapter(TransactionModelAdapter());
     }
 
-    // Buka Box untuk Kategori dan Transaksi
+    // Buka Box untuk Kategori, Transaksi, dan Pengaturan
     _categoryBox = await Hive.openBox<CategoryModel>(HiveConstants.categoriesBox);
     _transactionBox = await Hive.openBox<TransactionModel>(HiveConstants.transactionsBox);
+    await Hive.openBox(HiveConstants.settingsBox);
 
     // Seed default kategori jika box masih kosong
     await _seedDefaultCategoriesIfEmpty();

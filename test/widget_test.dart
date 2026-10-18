@@ -19,6 +19,7 @@ void main() {
 
     await Hive.openBox<CategoryModel>('categories_box');
     await Hive.openBox<TransactionModel>('transactions_box');
+    await Hive.openBox('settings_box');
   });
 
   tearDownAll(() async {

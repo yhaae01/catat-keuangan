@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-<!-- Izin Kamera untuk Scan Struk -->
+    <!-- Izin Kamera untuk Scan Struk -->
     <uses-permission android:name="android.permission.CAMERA" />
     
     <!-- Izin Akses Galeri/Foto -->
@@ -7,9 +7,9 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     
     <application
-        android:label="catat_keuangan"
+        android:label="Catat Keuangan"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"
