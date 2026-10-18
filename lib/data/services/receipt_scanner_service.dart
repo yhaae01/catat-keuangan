@@ -37,14 +37,17 @@ class ReceiptScannerService {
     }
   }
 
-  /// Menganalisis string teks struk: mengekstrak nominal terbesar, judul toko, dan mencocokkan kategori
+  /// Menganalisis string teks struk: mengekstrak nominal terbesar, judul toko,
+  /// daftar item belanjaan, dan mencocokkan kategori
   Future<ReceiptScanResult> analyzeReceiptText({
     required String rawText,
     required CategoryProvider categoryProvider,
     bool autoCreateCategoryIfNotFound = true,
+    String? imagePath,
   }) async {
     final largestAmount = ReceiptParserHelper.extractLargestAmount(rawText);
     final merchantTitle = ReceiptParserHelper.extractMerchantTitle(rawText);
+    final detectedItems = ReceiptParserHelper.extractItems(rawText);
 
     final matchResult = await ReceiptParserHelper.matchOrSuggestCategory(
       rawText: rawText,
@@ -53,17 +56,29 @@ class ReceiptScannerService {
       autoCreateIfNotFound: autoCreateCategoryIfNotFound,
     );
 
+    // Jika item terdeteksi, hitung total dari items sebagai alternatif
+    double finalAmount = largestAmount;
+    if (detectedItems.isNotEmpty) {
+      final itemsTotal = detectedItems.fold<double>(0.0, (sum, item) => sum + item.subtotal);
+      // Gunakan total dari baris TOTAL jika lebih besar, jika tidak gunakan total items
+      if (itemsTotal > 0 && finalAmount == 0) {
+        finalAmount = itemsTotal;
+      }
+    }
+
     return ReceiptScanResult(
       rawText: rawText,
       detectedTitle: merchantTitle,
-      totalAmount: largestAmount,
+      totalAmount: finalAmount,
       category: matchResult.category,
       isNewCategoryCreated: matchResult.isNewCreated,
       detectedDate: DateTime.now(),
+      detectedItems: detectedItems,
+      imagePath: imagePath,
     );
   }
 
-  /// Alur lengkap: Ambil gambar struk -> OCR Teks -> Ekstraksi Nominal & Kategori
+  /// Alur lengkap: Ambil gambar struk -> OCR Teks -> Ekstraksi Nominal, Items & Kategori
   Future<ReceiptScanResult?> scanAndProcessReceipt({
     ImageSource source = ImageSource.camera,
     required CategoryProvider categoryProvider,
@@ -81,6 +96,7 @@ class ReceiptScannerService {
       rawText: rawText,
       categoryProvider: categoryProvider,
       autoCreateCategoryIfNotFound: autoCreateCategoryIfNotFound,
+      imagePath: image.path,
     );
   }
 }
