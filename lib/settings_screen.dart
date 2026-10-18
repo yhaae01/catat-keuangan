@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import 'core/utils/report_export_service.dart';
+import 'logic/providers/transaction_provider.dart';
 import 'theme_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -8,13 +11,32 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
+    final transactionProvider = context.watch<TransactionProvider>();
     final isDark = themeProvider.isDarkMode;
     final primary = themeProvider.primaryColor;
 
+    Future<void> exportCsv() async {
+      final file = await ReportExportService.exportCsvToFile(
+        transactionProvider.filteredTransactions,
+        dateRange: transactionProvider.selectedDateRange,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('CSV disimpan: ${file.path}')));
+    }
+
+    Future<void> exportPdf() async {
+      final file = await ReportExportService.exportPdfToFile(
+        transactionProvider.filteredTransactions,
+        dateRange: transactionProvider.selectedDateRange,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('PDF disimpan: ${file.path}')));
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pengaturan'),
-      ),
+      appBar: AppBar(title: const Text('Pengaturan')),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         children: [
@@ -31,7 +53,9 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 10),
 
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: SwitchListTile(
@@ -81,7 +105,9 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 10),
 
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -98,10 +124,13 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: themeProvider.availableColors.entries.map((entry) {
+                    children: themeProvider.availableColors.entries.map((
+                      entry,
+                    ) {
                       final name = entry.key;
                       final color = entry.value;
-                      final isSelected = themeProvider.selectedColorName == name;
+                      final isSelected =
+                          themeProvider.selectedColorName == name;
 
                       return InkWell(
                         onTap: () {
@@ -159,6 +188,58 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
+          const Text(
+            'Eksport Data',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(
+                      Icons.table_rows_rounded,
+                      color: Colors.green,
+                    ),
+                    title: const Text('Ekspor CSV'),
+                    subtitle: Text(
+                      transactionProvider.selectedDateRange == null
+                          ? 'Semua data saat ini'
+                          : 'Periode aktif: ${transactionProvider.activeRangeLabel}',
+                    ),
+                    onTap: exportCsv,
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.picture_as_pdf_rounded,
+                      color: Colors.red,
+                    ),
+                    title: const Text('Ekspor PDF'),
+                    subtitle: Text(
+                      transactionProvider.selectedDateRange == null
+                          ? 'Semua data saat ini'
+                          : 'Periode aktif: ${transactionProvider.activeRangeLabel}',
+                    ),
+                    onTap: exportPdf,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
           // Section: Info Aplikasi
           const Text(
             'Tentang Aplikasi',
@@ -172,7 +253,9 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 10),
 
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Column(
               children: [
                 ListTile(
@@ -182,13 +265,19 @@ class SettingsScreen extends StatelessWidget {
                       color: primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.info_outline_rounded, color: primary, size: 22),
+                    child: Icon(
+                      Icons.info_outline_rounded,
+                      color: primary,
+                      size: 22,
+                    ),
                   ),
                   title: const Text(
                     'Catat Keuangan',
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                   ),
-                  subtitle: const Text('Versi 1.0.0+1 • Offline Local Database (Hive)'),
+                  subtitle: const Text(
+                    'Versi 1.0.0+1 • Offline Local Database (Hive)',
+                  ),
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
@@ -198,7 +287,11 @@ class SettingsScreen extends StatelessWidget {
                       color: Colors.blue.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.document_scanner_rounded, color: Colors.blue, size: 22),
+                    child: const Icon(
+                      Icons.document_scanner_rounded,
+                      color: Colors.blue,
+                      size: 22,
+                    ),
                   ),
                   title: const Text(
                     'AI OCR Scanner',

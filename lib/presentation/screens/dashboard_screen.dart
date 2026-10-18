@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/utils/currency_helper.dart';
 import '../../data/models/transaction_model.dart';
 import '../../logic/providers/category_provider.dart';
@@ -20,15 +21,12 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   /// Membuka halaman AddTransactionScreen (full-page form)
-  void _openAddTransactionScreen({
-    TransactionModel? transactionToEdit,
-  }) {
+  void _openAddTransactionScreen({TransactionModel? transactionToEdit}) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => AddTransactionScreen(
-          transactionToEdit: transactionToEdit,
-        ),
+        builder: (_) =>
+            AddTransactionScreen(transactionToEdit: transactionToEdit),
       ),
     );
   }
@@ -54,10 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 const Text(
                   'Tambah Catatan Keuangan',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -152,10 +147,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
               ),
@@ -172,7 +164,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Hapus Transaksi?'),
-        content: Text('Yakin ingin menghapus transaksi "${tx.title}" sebesar ${CurrencyHelper.formatRupiah(tx.amount)}?'),
+        content: Text(
+          'Yakin ingin menghapus transaksi "${tx.title}" sebesar ${CurrencyHelper.formatRupiah(tx.amount)}?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -182,7 +176,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               Navigator.pop(ctx);
-              await context.read<TransactionProvider>().deleteTransaction(tx.id);
+              await context.read<TransactionProvider>().deleteTransaction(
+                tx.id,
+              );
             },
             child: const Text('Hapus'),
           ),
@@ -225,7 +221,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          // Tombol Kelola Kategori
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: theme.cardTheme.color ?? theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+            ),
+            child: PopupMenuButton<DashboardDateFilter>(
+              tooltip: 'Filter periode laporan',
+              icon: Icon(Icons.filter_list_rounded, color: primary),
+              onSelected: (value) async {
+                if (value == DashboardDateFilter.custom) {
+                  final picked = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now().add(const Duration(days: 3650)),
+                    initialDateRange:
+                        txProvider.selectedDateRange ??
+                        DateTimeRange(
+                          start: DateTime.now().subtract(
+                            const Duration(days: 30),
+                          ),
+                          end: DateTime.now(),
+                        ),
+                  );
+                  if (picked != null) {
+                    txProvider.applyDateFilter(
+                      preset: DashboardDateFilter.custom,
+                      customRange: picked,
+                    );
+                  }
+                  return;
+                }
+
+                txProvider.applyDateFilter(preset: value);
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: DashboardDateFilter.all,
+                  child: Text('Semua Waktu'),
+                ),
+                const PopupMenuItem(
+                  value: DashboardDateFilter.today,
+                  child: Text('Hari Ini'),
+                ),
+                const PopupMenuItem(
+                  value: DashboardDateFilter.week,
+                  child: Text('Minggu Ini'),
+                ),
+                const PopupMenuItem(
+                  value: DashboardDateFilter.month,
+                  child: Text('Bulan Ini'),
+                ),
+                const PopupMenuItem(
+                  value: DashboardDateFilter.custom,
+                  child: Text('Pilih Rentang'),
+                ),
+              ],
+            ),
+          ),
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
@@ -244,7 +299,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               },
             ),
           ),
-          // Tombol Pengaturan
           Container(
             margin: const EdgeInsets.only(right: 16),
             decoration: BoxDecoration(
@@ -277,19 +331,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   // Balance Card Section
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                       child: BalanceCard(
-                        balance: txProvider.totalBalance,
-                        income: txProvider.totalIncome,
-                        expense: txProvider.totalExpense,
+                        balance: txProvider.filteredBalance,
+                        income: txProvider.filteredIncome,
+                        expense: txProvider.filteredExpense,
                       ),
                     ),
                   ),
 
-                  // Header Riwayat Transaksi
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 2),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Periode: ${txProvider.activeRangeLabel}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          if (txProvider.selectedFilter !=
+                              DashboardDateFilter.all)
+                            TextButton.icon(
+                              onPressed: txProvider.clearDateFilter,
+                              icon: const Icon(Icons.clear_rounded, size: 16),
+                              label: const Text('Reset'),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -302,13 +384,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              '${txProvider.transactions.length} Transaksi',
+                              '${txProvider.filteredTransactions.length} Transaksi',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -321,8 +406,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
 
-                  // Daftar Transaksi atau Tampilan Kosong
-                  if (txProvider.transactions.isEmpty)
+                  if (txProvider.filteredTransactions.isEmpty)
                     SliverFillRemaining(
                       hasScrollBody: false,
                       child: Center(
@@ -365,26 +449,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     )
                   else
                     SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
                       sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final tx = txProvider.transactions[index];
-                            final category = catProvider.getCategoryById(tx.categoryId);
-                            return TransactionItem(
-                              transaction: tx,
-                              category: category,
-                              onTap: () => _openAddTransactionScreen(transactionToEdit: tx),
-                              onDelete: () => _confirmDeleteTransaction(context, tx),
-                            );
-                          },
-                          childCount: txProvider.transactions.length,
-                        ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final tx = txProvider.filteredTransactions[index];
+                          final category = catProvider.getCategoryById(
+                            tx.categoryId,
+                          );
+                          return TransactionItem(
+                            transaction: tx,
+                            category: category,
+                            onTap: () => _openAddTransactionScreen(
+                              transactionToEdit: tx,
+                            ),
+                            onDelete: () =>
+                                _confirmDeleteTransaction(context, tx),
+                          );
+                        }, childCount: txProvider.filteredTransactions.length),
                       ),
                     ),
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 80),
-                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
                 ],
               ),
             ),

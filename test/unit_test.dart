@@ -1,16 +1,23 @@
 import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:catat_keuangan/data/models/category_model.dart';
 import 'package:catat_keuangan/data/models/transaction_model.dart';
 import 'package:catat_keuangan/data/models/transaction_type.dart';
 import 'package:catat_keuangan/core/utils/icon_helper.dart';
 import 'package:catat_keuangan/core/utils/receipt_parser_helper.dart';
+import 'package:catat_keuangan/core/utils/report_export_service.dart';
+import 'package:catat_keuangan/logic/providers/transaction_provider.dart';
 
 void main() {
   late Directory tempDir;
 
   setUpAll(() async {
+    await initializeDateFormatting('id_ID', null);
+
     tempDir = await Directory.systemTemp.createTemp('hive_test_');
     Hive.init(tempDir.path);
 
@@ -94,6 +101,87 @@ void main() {
     });
   });
 
+  group('Transaction provider reporting filters', () {
+    test(
+      'Filters transactions by selected date range and recalculates totals',
+      () {
+        final now = DateTime(2026, 10, 20, 12, 0, 0);
+        final transactions = [
+          TransactionModel(
+            id: 'tx-1',
+            title: 'Gaji Bulanan',
+            amount: 5000000,
+            date: now,
+            type: TransactionType.income,
+            categoryId: 'cat-income',
+          ),
+          TransactionModel(
+            id: 'tx-2',
+            title: 'Belanja Makanan',
+            amount: 85000,
+            date: now.subtract(const Duration(days: 10)),
+            type: TransactionType.expense,
+            categoryId: 'cat-food',
+          ),
+          TransactionModel(
+            id: 'tx-3',
+            title: 'Bensin',
+            amount: 120000,
+            date: now.subtract(const Duration(days: 3)),
+            type: TransactionType.expense,
+            categoryId: 'cat-transport',
+          ),
+        ];
+
+        final provider = TransactionProvider();
+        provider.setTransactionsForTesting(transactions);
+        provider.applyDateFilter(
+          preset: DashboardDateFilter.custom,
+          customRange: DateTimeRange(
+            start: now.subtract(const Duration(days: 4)),
+            end: now
+                .add(const Duration(days: 1))
+                .subtract(const Duration(microseconds: 1)),
+          ),
+        );
+
+        expect(provider.filteredTransactions, hasLength(2));
+        expect(provider.filteredIncome, 5000000.0);
+        expect(provider.filteredExpense, 120000.0);
+        expect(provider.filteredBalance, 4880000.0);
+      },
+    );
+  });
+
+  group('Report export service', () {
+    test('Generates CSV rows for report export', () {
+      final transactions = [
+        TransactionModel(
+          id: 'tx-1',
+          title: 'Gaji Bulanan',
+          amount: 5000000,
+          date: DateTime(2026, 10, 20),
+          type: TransactionType.income,
+          categoryId: 'cat-income',
+        ),
+        TransactionModel(
+          id: 'tx-2',
+          title: 'Belanja Makanan',
+          amount: 85000,
+          date: DateTime(2026, 10, 18),
+          type: TransactionType.expense,
+          categoryId: 'cat-food',
+        ),
+      ];
+
+      final csv = ReportExportService.generateCsv(transactions);
+      expect(csv, contains('Tanggal'));
+      expect(csv, contains('Gaji Bulanan'));
+      expect(csv, contains('Belanja Makanan'));
+      expect(csv, contains('5000000'));
+    });
+  });
+
   group('ReceiptParserHelper Tests', () {
     test('Extracts largest amount correctly from receipt text', () {
       const receiptText = '''
@@ -119,6 +207,37 @@ TERIMA KASIH
       // Largest amount in receipt candidates: 100.000 or 78.100
       expect(amount, greaterThanOrEqualTo(78100.0));
       expect(amount, lessThanOrEqualTo(100000.0));
+    });
+
+    test('Ignores receipt header lines and extracts valid item lines', () {
+      const receiptText = '''
+CETAK ULANG
+Mode: TAKE AWAY
+Kasir : ALEX
+Tanggal : 18/10/2026 14:32
+No. Nota : 12345
+Paket Wingers 1x @35.000  35.000
+Saos Keju 1x @8.000  8.000
+GRAND TOTAL
+38.000
+''';
+
+      final items = ReceiptParserHelper.extractItems(receiptText);
+      final totalAmount = ReceiptParserHelper.extractTotalAmount(receiptText);
+
+      expect(items, hasLength(2));
+      expect(
+        items.map((e) => e.name),
+        containsAll(['Paket Wingers', 'Saos Keju']),
+      );
+      expect(items.every((item) => item.qty > 0), isTrue);
+      expect(totalAmount, 38000.0);
+      expect(
+        items.any(
+          (item) => item.name.contains('Mode') || item.name.contains('Kasir'),
+        ),
+        isFalse,
+      );
     });
 
     test('Extracts merchant title from header lines', () {
@@ -149,7 +268,8 @@ TOTAL: Rp 45.000
         ),
       ];
 
-      const receiptCoffee = 'STARBUCKS COFFEE\nCAFE LATTE 55.000\nTOTAL: 55.000';
+      const receiptCoffee =
+          'STARBUCKS COFFEE\nCAFE LATTE 55.000\nTOTAL: 55.000';
       final match1 = await ReceiptParserHelper.matchOrSuggestCategory(
         rawText: receiptCoffee,
         existingCategories: existingCategories,
@@ -158,7 +278,8 @@ TOTAL: Rp 45.000
       expect(match1.category.name, 'Makanan & Minuman');
       expect(match1.isNewCreated, false);
 
-      const receiptIndomaret = 'INDOMARET POINT\nSNACK & MINUMAN\nTOTAL: 30.000';
+      const receiptIndomaret =
+          'INDOMARET POINT\nSNACK & MINUMAN\nTOTAL: 30.000';
       final match2 = await ReceiptParserHelper.matchOrSuggestCategory(
         rawText: receiptIndomaret,
         existingCategories: existingCategories,
