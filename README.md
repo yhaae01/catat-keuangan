@@ -1,17 +1,44 @@
-# catat_keuangan
+# 💰 Expense Tracker AI (Scan Struk Auto-Categorize)
 
-A new Flutter project.
+Aplikasi pencatatan keuangan pribadi pintar berbasis **Flutter** yang dilengkapi fitur kategori dinamis dan pemindaian struk berbasis AI/OCR untuk pencatatan otomatis secara *real-time*.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## ✨ Fitur Utama
 
-A few resources to get you started if this is your first Flutter project:
+- 📥 **Catat Pemasukan & Pengeluaran:** Pencatatan transaksi manual yang cepat dan intuitif.
+- 🏷️ **Kategori Dinamis:** Bebas menambah, mengedit, atau menghapus kategori pemasukan & pengeluaran sesuai kebutuhan.
+- 🧾 **OCR / Auto-Scan Struk:** Ambil foto atau *upload screenshot* struk belanja, aplikasi akan otomatis membaca total nominal dan mendeteksi kriteria transaksi.
+- 🤖 **Auto-Category Detection:** AI/Text Parser cerdas yang bisa menebak kategori atau otomatis buat kategori baru jika belum tersedia.
+- 💾 **Local Offline Storage:** Menggunakan **Hive Database** sehingga data tersimpan cepat, aman, dan dapat diakses offline.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🛠️ Tech Stack & Dependencies
+
+- **Framework:** Flutter (Dart)
+- **State Management:** `flutter_bloc` / `provider`
+- **Database Local:** `hive_flutter`
+- **OCR / AI Text Recognition:** `google_mlkit_text_recognition`
+- **Image Picker:** `image_picker`
+- **Utilities:** `intl`, `uuid`, `path_provider`
+
+---
+
+## 🚀 Cara Menjalankan Project
+
+### 1. Prasyarat
+Pastikan kamu sudah menginstal:
+- [Flutter SDK](https://docs.flutter.dev/get-started/install)
+- Android Studio / VS Code + Flutter Extension
+
+### 2. Clone & Setup Project
+```bash
+# Clone repository ini (jika menggunakan git)
+git clone [https://github.com/username/expense_tracker_ai.git](https://github.com/username/expense_tracker_ai.git)
+
+# Masuk ke direktori project
+cd expense_tracker_ai
+
+# Install seluruh dependency
+flutter pub get

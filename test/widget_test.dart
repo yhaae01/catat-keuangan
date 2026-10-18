@@ -1,30 +1,40 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:hive/hive.dart';
+import 'package:catat_keuangan/data/models/category_model.dart';
+import 'package:catat_keuangan/data/models/transaction_model.dart';
+import 'package:catat_keuangan/data/models/transaction_type.dart';
 import 'package:catat_keuangan/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  late Directory tempDir;
+
+  setUpAll(() async {
+    tempDir = await Directory.systemTemp.createTemp('hive_widget_test_');
+    Hive.init(tempDir.path);
+
+    if (!Hive.isAdapterRegistered(0)) Hive.registerAdapter(TransactionTypeAdapter());
+    if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(CategoryModelAdapter());
+    if (!Hive.isAdapterRegistered(2)) Hive.registerAdapter(TransactionModelAdapter());
+
+    await Hive.openBox<CategoryModel>('categories_box');
+    await Hive.openBox<TransactionModel>('transactions_box');
+  });
+
+  tearDownAll(() async {
+    await Hive.close();
+    if (tempDir.existsSync()) {
+      await tempDir.delete(recursive: true);
+    }
+  });
+
+  testWidgets('DashboardScreen smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Dompet Saya'), findsOneWidget);
+    expect(find.text('Catat Keuangan'), findsOneWidget);
+    expect(find.text('Total Saldo'), findsOneWidget);
+    expect(find.text('Catat / Scan'), findsOneWidget);
   });
 }
