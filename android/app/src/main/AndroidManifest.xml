@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- Izin Kamera untuk Scan Struk -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    
+    <!-- Izin Akses Galeri/Foto -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    
     <application
         android:label="catat_keuangan"
         android:name="${applicationName}"
