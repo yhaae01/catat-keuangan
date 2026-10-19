@@ -23,6 +23,7 @@ class AddTransactionScreen extends StatefulWidget {
   final double? initialAmount;
   final CategoryModel? initialCategory;
   final TransactionType? initialType;
+  final bool startInScan;
 
   const AddTransactionScreen({
     super.key,
@@ -31,6 +32,7 @@ class AddTransactionScreen extends StatefulWidget {
     this.initialAmount,
     this.initialCategory,
     this.initialType,
+    this.startInScan = false,
   });
 
   @override
@@ -41,7 +43,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     with SingleTickerProviderStateMixin {
   // Mode selector
   late TabController _tabController;
-  int _currentMode = 0; // 0 = Manual, 1 = Scan
+  late int _currentMode; // 0 = Manual, 1 = Scan
 
   // Form fields
   final _formKey = GlobalKey<FormState>();
@@ -62,7 +64,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _currentMode = widget.startInScan ? 1 : 0;
+    _tabController = TabController(
+      length: 2,
+      initialIndex: _currentMode,
+      vsync: this,
+    );
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() => _currentMode = _tabController.index);

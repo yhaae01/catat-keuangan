@@ -90,9 +90,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const AddTransactionScreen(
-                          initialType: null, // akan default ke scan tab
-                        ),
+                        builder: (_) =>
+                            const AddTransactionScreen(startInScan: true),
                       ),
                     );
                   },
