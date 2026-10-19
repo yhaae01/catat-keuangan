@@ -1,44 +1,47 @@
-# 💰 Expense Tracker AI (Scan Struk Auto-Categorize)
+# Catat Keuangan
 
-Aplikasi pencatatan keuangan pribadi pintar berbasis **Flutter** yang dilengkapi fitur kategori dinamis dan pemindaian struk berbasis AI/OCR untuk pencatatan otomatis secara *real-time*.
+Aplikasi pencatatan pemasukan dan pengeluaran berbasis Flutter. Transaksi dapat dicatat manual atau dibuat dari foto struk menggunakan OCR.
 
----
+## Fitur
 
-## ✨ Fitur Utama
+- Catat transaksi pemasukan dan pengeluaran, termasuk beberapa item, jumlah, dan harga satuan.
+- Harga satuan ditampilkan dengan pemisah ribuan, misalnya `125.000`.
+- Pindai struk melalui kamera atau pilih gambar dari galeri. Dari dashboard, pilihan **Scan Struk Belanja** langsung membuka mode scan.
+- OCR Google ML Kit membaca teks struk. Parser aplikasi membantu mengambil nama toko, item, nominal, dan mencocokkan kategori; kategori baru dapat dibuat jika tidak ditemukan.
+- Jika berpindah mode saat form berisi data, aplikasi meminta konfirmasi sebelum mengosongkan form. Item yang berisi data juga meminta konfirmasi sebelum dihapus; item kosong dapat langsung dihapus.
+- Kategori pemasukan dan pengeluaran dapat dikelola, sementara transaksi disimpan secara lokal menggunakan Hive.
 
-- 📥 **Catat Pemasukan & Pengeluaran:** Pencatatan transaksi manual yang cepat dan intuitif.
-- 🏷️ **Kategori Dinamis:** Bebas menambah, mengedit, atau menghapus kategori pemasukan & pengeluaran sesuai kebutuhan.
-- 🧾 **OCR / Auto-Scan Struk:** Ambil foto atau *upload screenshot* struk belanja, aplikasi akan otomatis membaca total nominal dan mendeteksi kriteria transaksi.
-- 🤖 **Auto-Category Detection:** AI/Text Parser cerdas yang bisa menebak kategori atau otomatis buat kategori baru jika belum tersedia.
-- 💾 **Local Offline Storage:** Menggunakan **Hive Database** sehingga data tersimpan cepat, aman, dan dapat diakses offline.
+## Teknologi
 
----
+- Flutter dan Dart
+- Provider untuk state management
+- Hive untuk penyimpanan lokal
+- Google ML Kit Text Recognition dan `image_picker` untuk pemindaian struk
+- `intl` untuk format mata uang dan tanggal
 
-## 🛠️ Tech Stack & Dependencies
+## Menjalankan Aplikasi
 
-- **Framework:** Flutter (Dart)
-- **State Management:** `flutter_bloc` / `provider`
-- **Database Local:** `hive_flutter`
-- **OCR / AI Text Recognition:** `google_mlkit_text_recognition`
-- **Image Picker:** `image_picker`
-- **Utilities:** `intl`, `uuid`, `path_provider`
+Prasyarat: [Flutter SDK](https://docs.flutter.dev/get-started/install) dengan Dart SDK yang sesuai dengan batas versi di `pubspec.yaml`, serta Android Studio atau perangkat Android untuk menjalankan aplikasi.
 
----
+Di direktori proyek, jalankan:
 
-## 🚀 Cara Menjalankan Project
-
-### 1. Prasyarat
-Pastikan kamu sudah menginstal:
-- [Flutter SDK](https://docs.flutter.dev/get-started/install)
-- Android Studio / VS Code + Flutter Extension
-
-### 2. Clone & Setup Project
 ```bash
-# Clone repository ini (jika menggunakan git)
-git clone [https://github.com/username/expense_tracker_ai.git](https://github.com/username/expense_tracker_ai.git)
-
-# Masuk ke direktori project
-cd expense_tracker_ai
-
-# Install seluruh dependency
 flutter pub get
+flutter run
+```
+
+Fitur OCR memerlukan platform yang didukung oleh `google_mlkit_text_recognition` (Android dan iOS).
+
+## Pengujian dan Build
+
+Jalankan pengujian:
+
+```bash
+flutter test
+```
+
+Buat APK release Android:
+
+```bash
+flutter build apk --release
+```
