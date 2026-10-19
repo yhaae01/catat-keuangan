@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -78,21 +79,31 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     // Inisialisasi items — minimal 1 baris kosong
     if (edit != null) {
       // Jika edit, masukkan satu item dengan data dari transaksi
-      _items.add(_ItemEntry(
-        nameController: TextEditingController(text: edit.title),
-        qtyController: TextEditingController(text: '1'),
-        priceController: TextEditingController(
-          text: edit.amount.toStringAsFixed(0),
+      _items.add(
+        _ItemEntry(
+          nameController: TextEditingController(text: edit.title),
+          qtyController: TextEditingController(text: '1'),
+          priceController: TextEditingController(
+            text: _ThousandsSeparatorInputFormatter.formatDigits(
+              edit.amount.toStringAsFixed(0),
+            ),
+          ),
         ),
-      ));
+      );
     } else if (widget.initialAmount != null && widget.initialAmount! > 0) {
-      _items.add(_ItemEntry(
-        nameController: TextEditingController(text: widget.initialTitle ?? ''),
-        qtyController: TextEditingController(text: '1'),
-        priceController: TextEditingController(
-          text: widget.initialAmount!.toStringAsFixed(0),
+      _items.add(
+        _ItemEntry(
+          nameController: TextEditingController(
+            text: widget.initialTitle ?? '',
+          ),
+          qtyController: TextEditingController(text: '1'),
+          priceController: TextEditingController(
+            text: _ThousandsSeparatorInputFormatter.formatDigits(
+              widget.initialAmount!.toStringAsFixed(0),
+            ),
+          ),
         ),
-      ));
+      );
     } else {
       _addEmptyItem();
     }
@@ -123,26 +134,139 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   }
 
   void _addEmptyItem() {
-    _items.add(_ItemEntry(
-      nameController: TextEditingController(),
-      qtyController: TextEditingController(text: '1'),
-      priceController: TextEditingController(),
-    ));
+    _items.add(
+      _ItemEntry(
+        nameController: TextEditingController(),
+        qtyController: TextEditingController(text: '1'),
+        priceController: TextEditingController(),
+      ),
+    );
   }
 
-  void _removeItem(int index) {
+  Future<void> _removeItem(int index) async {
     if (_items.length <= 1) return;
+
+    final item = _items[index];
+    final hasData =
+        item.nameController.text.trim().isNotEmpty ||
+        item.priceController.text.trim().isNotEmpty ||
+        item.qtyController.text.trim() != '1';
+
+    if (hasData) {
+      final shouldRemove = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Hapus item?'),
+          content: const Text('Item ini akan dihapus dari transaksi.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Hapus'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldRemove != true || !mounted) return;
+    }
+
     setState(() {
-      _items[index].dispose();
+      item.dispose();
       _items.removeAt(index);
     });
+  }
+
+  bool get _hasEnteredData {
+    return _noteController.text.trim().isNotEmpty ||
+        _scannedImagePath != null ||
+        _rawOcrText != null ||
+        _items.any(
+          (item) =>
+              item.nameController.text.trim().isNotEmpty ||
+              item.priceController.text.trim().isNotEmpty ||
+              item.qtyController.text.trim() != '1',
+        );
+  }
+
+  Future<void> _handleModeTap(int index) async {
+    if (index == _currentMode) return;
+
+    if (_isScanning) {
+      _tabController.animateTo(_currentMode);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tunggu pemindaian selesai terlebih dahulu.'),
+        ),
+      );
+      return;
+    }
+
+    if (!_hasEnteredData) return;
+
+    _tabController.animateTo(_currentMode);
+    final shouldReset = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sudah ada data yang terisi'),
+        content: const Text(
+          'Data yang terisi akan dihapus jika Anda berpindah mode. Lanjutkan?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Reset & Pindah'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldReset != true || !mounted) return;
+
+    final initialType = widget.initialType ?? TransactionType.expense;
+    final categories = context.read<CategoryProvider>().getCategoriesByType(
+      initialType,
+    );
+    setState(() {
+      _noteController.clear();
+      for (final item in _items) {
+        item.dispose();
+      }
+      _items
+        ..clear()
+        ..add(
+          _ItemEntry(
+            nameController: TextEditingController(),
+            qtyController: TextEditingController(text: '1'),
+            priceController: TextEditingController(),
+          ),
+        );
+      _scannedImagePath = null;
+      _rawOcrText = null;
+      _selectedType = initialType;
+      _selectedCategory = categories.isNotEmpty ? categories.first : null;
+      _selectedDate = DateTime.now();
+    });
+    _tabController.animateTo(index);
   }
 
   double get _totalAmount {
     double total = 0;
     for (final item in _items) {
       final qty = int.tryParse(item.qtyController.text) ?? 1;
-      final price = double.tryParse(
+      final price =
+          double.tryParse(
             item.priceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
           ) ??
           0;
@@ -221,15 +345,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           _items.clear();
 
           for (final detected in result.detectedItems) {
-            _items.add(_ItemEntry(
-              nameController: TextEditingController(text: detected.name),
-              qtyController: TextEditingController(
-                text: detected.qty.toString(),
+            _items.add(
+              _ItemEntry(
+                nameController: TextEditingController(text: detected.name),
+                qtyController: TextEditingController(
+                  text: detected.qty.toString(),
+                ),
+                priceController: TextEditingController(
+                  text: _ThousandsSeparatorInputFormatter.formatDigits(
+                    detected.unitPrice.toStringAsFixed(0),
+                  ),
+                ),
               ),
-              priceController: TextEditingController(
-                text: detected.unitPrice.toStringAsFixed(0),
-              ),
-            ));
+            );
           }
         } else if (result.totalAmount > 0) {
           // Jika tidak ada item terdeteksi, buat 1 item dengan total
@@ -237,15 +365,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             item.dispose();
           }
           _items.clear();
-          _items.add(_ItemEntry(
-            nameController: TextEditingController(
-              text: result.detectedTitle,
+          _items.add(
+            _ItemEntry(
+              nameController: TextEditingController(text: result.detectedTitle),
+              qtyController: TextEditingController(text: '1'),
+              priceController: TextEditingController(
+                text: _ThousandsSeparatorInputFormatter.formatDigits(
+                  result.totalAmount.toStringAsFixed(0),
+                ),
+              ),
             ),
-            qtyController: TextEditingController(text: '1'),
-            priceController: TextEditingController(
-              text: result.totalAmount.toStringAsFixed(0),
-            ),
-          ));
+          );
         }
       });
 
@@ -344,8 +474,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     final isDark = theme.brightness == Brightness.dark;
     final isEditing = widget.transactionToEdit != null;
     final categoryProvider = context.watch<CategoryProvider>();
-    final availableCategories =
-        categoryProvider.getCategoriesByType(_selectedType);
+    final availableCategories = categoryProvider.getCategoriesByType(
+      _selectedType,
+    );
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -363,13 +494,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             Container(
               margin: const EdgeInsets.fromLTRB(20, 4, 20, 8),
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF1E293B)
-                    : Colors.grey.shade100,
+                color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: TabBar(
                 controller: _tabController,
+                onTap: _handleModeTap,
                 indicator: BoxDecoration(
                   color: primary,
                   borderRadius: BorderRadius.circular(14),
@@ -719,15 +849,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       dense: true,
       tilePadding: const EdgeInsets.symmetric(horizontal: 8),
       childrenPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       collapsedShape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
       ),
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
-      collapsedBackgroundColor:
-          isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
+      collapsedBackgroundColor: isDark
+          ? const Color(0xFF0F172A)
+          : Colors.grey.shade50,
       title: const Text(
         'Lihat Teks OCR',
         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -762,7 +891,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor:
-          Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface,
+          Theme.of(context).cardTheme.color ??
+          Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -840,9 +970,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         labelText: 'Catatan / Keterangan (Opsional)',
         hintText: 'Contoh: Belanja di Alfamart, Kopi pagi, dll.',
         prefixIcon: const Icon(Icons.notes_rounded),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         filled: true,
         fillColor: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
       ),
@@ -893,7 +1021,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     return List.generate(_items.length, (index) {
       final item = _items[index];
       final qty = int.tryParse(item.qtyController.text) ?? 1;
-      final price = double.tryParse(
+      final price =
+          double.tryParse(
             item.priceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
           ) ??
           0;
@@ -987,8 +1116,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor:
-                    isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
+                fillColor: isDark
+                    ? const Color(0xFF0F172A)
+                    : Colors.grey.shade50,
               ),
               style: const TextStyle(fontSize: 14),
             ),
@@ -1034,6 +1164,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                   child: TextField(
                     controller: item.priceController,
                     keyboardType: TextInputType.number,
+                    inputFormatters: const [
+                      _ThousandsSeparatorInputFormatter(),
+                    ],
                     onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
                       labelText: 'Harga Satuan',
@@ -1116,16 +1249,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     bool isDark,
   ) {
     return DropdownButtonFormField<CategoryModel>(
-      initialValue: (_selectedCategory != null &&
+      initialValue:
+          (_selectedCategory != null &&
               availableCategories.any((c) => c.id == _selectedCategory!.id))
           ? _selectedCategory
           : (availableCategories.isNotEmpty ? availableCategories.first : null),
       decoration: InputDecoration(
         labelText: 'Kategori',
         prefixIcon: const Icon(Icons.category_outlined),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         filled: true,
         fillColor: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
       ),
@@ -1159,9 +1291,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         decoration: InputDecoration(
           labelText: 'Tanggal Transaksi',
           prefixIcon: const Icon(Icons.calendar_today_rounded),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
           filled: true,
           fillColor: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
         ),
@@ -1189,8 +1319,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: (_selectedType.isExpense ? Colors.red : primary)
-                .withValues(alpha: 0.3),
+            color: (_selectedType.isExpense ? Colors.red : primary).withValues(
+              alpha: 0.3,
+            ),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -1277,5 +1408,53 @@ class _ItemEntry {
     nameController.dispose();
     qtyController.dispose();
     priceController.dispose();
+  }
+}
+
+class _ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  const _ThousandsSeparatorInputFormatter();
+
+  static String formatDigits(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    final formatted = StringBuffer();
+    for (var index = 0; index < digits.length; index++) {
+      if (index > 0 && (digits.length - index) % 3 == 0) {
+        formatted.write('.');
+      }
+      formatted.write(digits[index]);
+    }
+    return formatted.toString();
+  }
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    final cursorPosition = newValue.selection.extentOffset.clamp(
+      0,
+      newValue.text.length,
+    );
+    final digitsBeforeCursor = newValue.text
+        .substring(0, cursorPosition)
+        .replaceAll(RegExp(r'\D'), '')
+        .length;
+    final formatted = formatDigits(digits);
+    final formattedCursor = formatDigits(
+      digits.substring(0, digitsBeforeCursor),
+    ).length;
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formattedCursor),
+    );
   }
 }
