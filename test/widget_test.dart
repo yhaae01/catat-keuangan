@@ -38,4 +38,19 @@ void main() {
     expect(find.text('Total Saldo'), findsOneWidget);
     expect(find.text('Catat / Scan'), findsOneWidget);
   });
+
+  testWidgets('SplashScreen displays branding and skips to DashboardScreen on Lewati tap',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Catat Keuangan'), findsOneWidget);
+    expect(find.text('Kelola Finansial Lebih Bijak & Teratur'), findsOneWidget);
+    expect(find.text('Lewati'), findsOneWidget);
+
+    await tester.tap(find.text('Lewati'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dompet Saya'), findsOneWidget);
+  });
 }

@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'data/datasources/hive_service.dart';
 import 'logic/providers/category_provider.dart';
 import 'logic/providers/transaction_provider.dart';
-import 'presentation/screens/dashboard_screen.dart';
+import 'presentation/screens/splash_screen.dart';
 import 'theme_provider.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
   await initializeDateFormatting('id_ID', null);
 
   // Inisialisasi Hive, mendaftarkan Adapter, dan membuka Boxes
@@ -19,7 +22,8 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Widget? home;
+  const MyApp({super.key, this.home});
 
   @override
   Widget build(BuildContext context) {
@@ -37,10 +41,11 @@ class MyApp extends StatelessWidget {
             theme: themeProvider.lightTheme,
             darkTheme: themeProvider.darkTheme,
             themeMode: themeProvider.themeMode,
-            home: const DashboardScreen(),
+            home: home ?? const SplashScreen(),
           );
         },
       ),
     );
   }
 }
+
