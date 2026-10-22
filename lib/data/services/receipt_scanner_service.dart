@@ -45,6 +45,7 @@ class ReceiptScannerService {
     bool autoCreateCategoryIfNotFound = true,
     String? imagePath,
   }) async {
+    final totalAmount = ReceiptParserHelper.extractTotalAmount(rawText);
     final largestAmount = ReceiptParserHelper.extractLargestAmount(rawText);
     final merchantTitle = ReceiptParserHelper.extractMerchantTitle(rawText);
     final detectedItems = ReceiptParserHelper.extractItems(rawText);
@@ -56,12 +57,12 @@ class ReceiptScannerService {
       autoCreateIfNotFound: autoCreateCategoryIfNotFound,
     );
 
-    // Jika item terdeteksi, hitung total dari items sebagai alternatif
-    double finalAmount = largestAmount;
+    // Prioritaskan extractTotalAmount (Grand Total), jika 0 gunakan largestAmount
+    double finalAmount = totalAmount > 0 ? totalAmount : largestAmount;
     if (detectedItems.isNotEmpty) {
       final itemsTotal = detectedItems.fold<double>(0.0, (sum, item) => sum + item.subtotal);
-      // Gunakan total dari baris TOTAL jika lebih besar, jika tidak gunakan total items
-      if (itemsTotal > 0 && finalAmount == 0) {
+      // Jika grand total belum didapat dari teks, gunakan total dari akumulasi items
+      if (finalAmount == 0 && itemsTotal > 0) {
         finalAmount = itemsTotal;
       }
     }

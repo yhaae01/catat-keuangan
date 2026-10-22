@@ -384,6 +384,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             ),
           );
         }
+
+        // Fallback: pastikan selalu ada minimal 1 item input untuk diedit manual
+        if (_items.isEmpty) {
+          _items.add(
+            _ItemEntry(
+              nameController: TextEditingController(),
+              qtyController: TextEditingController(text: '1'),
+              priceController: TextEditingController(),
+            ),
+          );
+        }
       });
 
       if (result.isNewCategoryCreated && mounted) {

@@ -287,5 +287,107 @@ TOTAL: Rp 45.000
 
       expect(match2.category.name, isNotEmpty);
     });
+
+    test('Parses multi-line receipt formats (Indomaret/Alfamart style)', () {
+      const receiptText = '''
+ALFAMART MERUYA ILIR
+================================
+SARI ROTI TAWAR
+15.000
+AQUA BOTOL 600ML
+2 x 3.500   7.000
+INDOMIE GOR AYAM BPOP
+3 PCS   9.300
+================================
+SUBTOTAL: 31.300
+PPN 11%: 3.443
+TOTAL BAYAR: 34.743
+TUNAI: 50.000
+KEMBALIAN: 15.257
+TERIMA KASIH TELAH BERBELANJA
+''';
+
+      final items = ReceiptParserHelper.extractItems(receiptText);
+      final total = ReceiptParserHelper.extractTotalAmount(receiptText);
+
+      expect(items, hasLength(3));
+      expect(items[0].name, 'Sari Roti Tawar');
+      expect(items[0].qty, 1);
+      expect(items[0].unitPrice, 15000.0);
+
+      expect(items[1].name, 'Aqua Botol 600ml');
+      expect(items[1].qty, 2);
+      expect(items[1].unitPrice, 3500.0);
+
+      expect(items[2].name, 'Indomie Gor Ayam Bpop');
+      expect(items[2].qty, 3);
+      expect(items[2].unitPrice, (9300.0 / 3).roundToDouble());
+
+      // Total Bayar harus terdeteksi 34.743, bukan Subtotal (31.300) atau Tunai (50.000)
+      expect(total, 34743.0);
+    });
+
+    test('Parses various quantity patterns and comma thousand separators', () {
+      const receiptText = '''
+WARUNG KOPI KITA
+NO. NOTA: 8872
+KASIR: BUDI
+2 Kopi Susu Tetangga 36,000
+Croissant Keju 1x 22,000
+x3 Donat Gula 18,000
+Apel Fuji 2 kg 40,000
+--------------------------------
+SUBTOTAL 116,000
+PB1 (10%) 11,600
+JUMLAH BAYAR 127,600
+CASH 150,000
+KEMBALI 22,400
+''';
+
+      final items = ReceiptParserHelper.extractItems(receiptText);
+      final total = ReceiptParserHelper.extractTotalAmount(receiptText);
+
+      expect(items, hasLength(4));
+      // 2 Kopi Susu Tetangga
+      expect(items[0].name, contains('Kopi Susu Tetangga'));
+      expect(items[0].qty, 2);
+      expect(items[0].unitPrice, 18000.0);
+
+      // Croissant Keju 1x
+      expect(items[1].name, contains('Croissant Keju'));
+      expect(items[1].qty, 1);
+      expect(items[1].unitPrice, 22000.0);
+
+      // x3 Donat Gula
+      expect(items[2].name, contains('Donat Gula'));
+      expect(items[2].qty, 3);
+      expect(items[2].unitPrice, 6000.0);
+
+      // Apel Fuji 2 kg
+      expect(items[3].name, contains('Apel Fuji'));
+      expect(items[3].qty, 2);
+      expect(items[3].unitPrice, 20000.0);
+
+      // JUMLAH BAYAR harus 127600, bukan 116000 (subtotal) atau 150000 (cash)
+      expect(total, 127600.0);
+    });
+
+    test('Correctly identifies universal headers & footers without false positives', () {
+      // Baris yang harus dikenali sebagai header/footer
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('CETAK ULANG'), isTrue);
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('Kasir: Siti'), isTrue);
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('Tgl: 22/10/2026'), isTrue);
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('No. Nota: 1234'), isTrue);
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('TERIMA KASIH'), isTrue);
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('SUBTOTAL: 50.000'), isTrue);
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('TUNAI 100.000'), isTrue);
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('Kembalian: 50.000'), isTrue);
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('==================='), isTrue);
+
+      // Nama item yang sah tidak boleh dianggap sebagai header/footer
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('Indomie Noodle Goreng'), isFalse);
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('Kopi Kenangan'), isFalse);
+      expect(ReceiptParserHelper.isUniversalHeaderOrFooter('Teh Botol Sosro'), isFalse);
+    });
   });
 }
