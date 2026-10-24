@@ -14,17 +14,19 @@ class HiveService {
   Box<TransactionModel>? _transactionBox;
 
   Box<CategoryModel> get categoryBox {
-    if (_categoryBox == null || !_categoryBox!.isOpen) {
-      throw StateError('CategoryBox belum diinisialisasi atau telah tertutup.');
+    if (_categoryBox != null && _categoryBox!.isOpen) {
+      return _categoryBox!;
     }
-    return _categoryBox!;
+    // Fallback: return already opened Hive box if available
+    return Hive.box<CategoryModel>(HiveConstants.categoriesBox);
   }
 
   Box<TransactionModel> get transactionBox {
-    if (_transactionBox == null || !_transactionBox!.isOpen) {
-      throw StateError('TransactionBox belum diinisialisasi atau telah tertutup.');
+    if (_transactionBox != null && _transactionBox!.isOpen) {
+      return _transactionBox!;
     }
-    return _transactionBox!;
+    // Fallback: return already opened Hive box if available
+    return Hive.box<TransactionModel>(HiveConstants.transactionsBox);
   }
 
   /// Inisialisasi Hive, mendaftarkan TypeAdapter, dan membuka Boxes

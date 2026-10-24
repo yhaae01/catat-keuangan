@@ -77,26 +77,44 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     });
 
     final edit = widget.transactionToEdit;
-    _noteController = TextEditingController(
-      text: edit?.title ?? widget.initialTitle ?? '',
-    );
+    _noteController = TextEditingController();
     _selectedType = edit?.type ?? widget.initialType ?? TransactionType.expense;
     _selectedDate = edit?.date ?? DateTime.now();
 
     // Inisialisasi items — minimal 1 baris kosong
     if (edit != null) {
-      // Jika edit, masukkan satu item dengan data dari transaksi
-      _items.add(
-        _ItemEntry(
-          nameController: TextEditingController(text: edit.title),
-          qtyController: TextEditingController(text: '1'),
-          priceController: TextEditingController(
-            text: _ThousandsSeparatorInputFormatter.formatDigits(
-              edit.amount.toStringAsFixed(0),
+      // 1. Isi Catatan/Keterangan dengan judul utama transaksi
+      _noteController = TextEditingController(text: edit.title);
+
+      // 2. Jika transaksi punya rincian item (transaksi baru)
+      if (edit.items.isNotEmpty) {
+        for (final detail in edit.items) {
+          _items.add(
+            _ItemEntry(
+              nameController: TextEditingController(text: detail.name),
+              qtyController: TextEditingController(text: detail.qty.toString()),
+              priceController: TextEditingController(
+                text: _ThousandsSeparatorInputFormatter.formatDigits(
+                  detail.price.toStringAsFixed(0),
+                ),
+              ),
+            ),
+          );
+        }
+      } else {
+        // 3. Fallback jika ini adalah transaksi lama yang belum pakai fitur sub-item
+        _items.add(
+          _ItemEntry(
+            nameController: TextEditingController(text: edit.title),
+            qtyController: TextEditingController(text: '1'),
+            priceController: TextEditingController(
+              text: _ThousandsSeparatorInputFormatter.formatDigits(
+                edit.amount.toStringAsFixed(0),
+              ),
             ),
           ),
-        ),
-      );
+        );
+      }
     } else if (widget.initialAmount != null && widget.initialAmount! > 0) {
       _items.add(
         _ItemEntry(
@@ -112,7 +130,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         ),
       );
     } else {
-      _addEmptyItem();
+      _items.add(
+        _ItemEntry(
+          nameController: TextEditingController(
+            text: widget.initialTitle ?? '',
+          ),
+          qtyController: TextEditingController(text: '1'),
+          priceController: TextEditingController(),
+        ),
+      );
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -438,36 +464,103 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       return;
     }
 
-    // Build title dari item list atau dari catatan
-    String title = _noteController.text.trim();
-    if (title.isEmpty) {
-      // Ambil nama item pertama yang tidak kosong
-      final firstItem = _items
-          .where((i) => i.nameController.text.trim().isNotEmpty)
-          .firstOrNull;
-      title = firstItem?.nameController.text.trim() ?? 'Transaksi';
+    // Filter dan parsing setiap baris item dari Daftar Item
+    final note = _noteController.text.trim();
+    final itemsToSave = <({String title, double amount, int qty})>[];
+
+    for (var i = 0; i < _items.length; i++) {
+      final entry = _items[i];
+      final rawName = entry.nameController.text.trim();
+      final qty = int.tryParse(entry.qtyController.text) ?? 1;
+      final price =
+          double.tryParse(
+            entry.priceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+          ) ??
+          0;
+
+      // Lewati baris yang benar-benar kosong (nama dan harga kosong semua)
+      if (rawName.isEmpty && price <= 0) {
+        continue;
+      }
+
+      final itemSubtotal = qty > 0 ? (qty * price) : price;
+      if (itemSubtotal <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              rawName.isNotEmpty
+                  ? 'Nominal untuk "$rawName" harus lebih dari 0!'
+                  : 'Nominal pada Item ${i + 1} harus lebih dari 0!',
+            ),
+          ),
+        );
+        return;
+      }
+
+      // Jika nama item kosong, gunakan Catatan sebagai judul fallback
+      final itemTitle = rawName.isNotEmpty ? rawName : note;
+      if (itemTitle.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Masukkan nama item atau isi kolom Catatan / Keterangan untuk Item ${i + 1}!',
+            ),
+          ),
+        );
+        return;
+      }
+      itemsToSave.add((
+        title: itemTitle,
+        amount: itemSubtotal,
+        qty: qty > 0 ? qty : 1,
+      ));
+    }
+
+    if (itemsToSave.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Masukkan minimal satu item transaksi yang valid!'),
+        ),
+      );
+      return;
     }
 
     final txProvider = context.read<TransactionProvider>();
     final isEditing = widget.transactionToEdit != null;
 
-    bool ok;
+    bool ok = false;
     if (isEditing) {
+      // Saat edit: perbarui transaksi yang ada dengan semua item sebagai sub-items
+      final totalAmount = itemsToSave.fold(0.0, (s, e) => s + e.amount);
+      final headerTitle = note.isNotEmpty
+          ? note
+          : itemsToSave.map((e) => e.title).join(', ');
+      final subItems = itemsToSave
+          .map(
+            (e) => TransactionItemDetail(
+              name: e.title,
+              qty: e.qty,
+              price: e.amount / e.qty,
+            ),
+          )
+          .toList();
       final updated = widget.transactionToEdit!.copyWith(
-        title: title,
-        amount: total,
+        title: headerTitle,
+        amount: totalAmount,
         date: _selectedDate,
         type: _selectedType,
         categoryId: _selectedCategory!.id,
+        items: subItems,
       );
       ok = await txProvider.updateTransaction(updated);
     } else {
-      ok = await txProvider.addTransaction(
-        title: title,
-        amount: total,
+      // Simpan 1 transaksi header dengan sub-items di dalamnya
+      ok = await txProvider.addMultipleTransactions(
+        items: itemsToSave,
         date: _selectedDate,
         type: _selectedType,
         categoryId: _selectedCategory!.id,
+        note: note.isNotEmpty ? note : null,
       );
     }
 

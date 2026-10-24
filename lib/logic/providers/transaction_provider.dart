@@ -191,26 +191,14 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  /// Menambahkan transaksi baru
-  Future<bool> addTransaction({
-    required String title,
-    required double amount,
-    required DateTime date,
-    required TransactionType type,
-    required String categoryId,
-  }) async {
+  /// Menambahkan beberapa transaksi baru sekaligus ke database Hive
+  Future<bool> addTransactions(List<TransactionModel> transactions) async {
     try {
-      final newTx = TransactionModel(
-        id: _uuid.v4(),
-        title: title.trim(),
-        amount: amount,
-        date: date,
-        type: type,
-        categoryId: categoryId,
-      );
+      if (transactions.isEmpty) return true;
 
       final box = _hiveService.transactionBox;
-      await box.put(newTx.id, newTx);
+      final entries = {for (final tx in transactions) tx.id: tx};
+      await box.putAll(entries);
 
       final list = box.values.toList();
       list.sort((a, b) => b.date.compareTo(a.date));
@@ -222,6 +210,69 @@ class TransactionProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Menambahkan satu transaksi header dengan rincian sub-items.
+  /// Hanya 1 baris transaksi yang dibuat di list utama; item-item
+  /// disimpan sebagai detail di dalam transaksi tersebut.
+  Future<bool> addMultipleTransactions({
+    required List<({String title, double amount, int qty})> items,
+    required DateTime date,
+    required TransactionType type,
+    required String categoryId,
+    String? note,
+  }) async {
+    if (items.isEmpty) return true;
+
+    // Hitung total dari semua item
+    final double totalAmount = items.fold(0.0, (sum, e) => sum + e.amount);
+
+    // Buat daftar sub-item
+    final subItems = items
+        .map(
+          (e) => TransactionItemDetail(
+            name: e.title,
+            qty: e.qty,
+            price: e.amount / (e.qty > 0 ? e.qty : 1),
+          ),
+        )
+        .toList();
+
+    // Judul header: ambil dari `note` jika ada, atau gabungan nama item
+    final headerTitle = (note != null && note.isNotEmpty)
+        ? note
+        : items.map((e) => e.title).join(', ');
+
+    // Simpan 1 transaksi header saja
+    return addTransaction(
+      title: headerTitle,
+      amount: totalAmount,
+      date: date,
+      type: type,
+      categoryId: categoryId,
+      items: subItems,
+    );
+  }
+
+  /// Menambahkan transaksi baru (dengan opsional sub-items)
+  Future<bool> addTransaction({
+    required String title,
+    required double amount,
+    required DateTime date,
+    required TransactionType type,
+    required String categoryId,
+    List<TransactionItemDetail> items = const [],
+  }) async {
+    final newTx = TransactionModel(
+      id: _uuid.v4(),
+      title: title.trim(),
+      amount: amount,
+      date: date,
+      type: type,
+      categoryId: categoryId,
+      items: items,
+    );
+    return addTransactions([newTx]);
   }
 
   /// Mengedit transaksi yang sudah ada

@@ -3,6 +3,39 @@ import 'package:hive/hive.dart';
 import '../../core/constants/hive_constants.dart';
 import 'transaction_type.dart';
 
+/// Merepresentasikan satu baris rincian item di dalam sebuah transaksi.
+class TransactionItemDetail {
+  final String name;
+  final int qty;
+  final double price;
+
+  const TransactionItemDetail({
+    required this.name,
+    required this.qty,
+    required this.price,
+  });
+
+  /// Subtotal item ini (qty × price)
+  double get subtotal => qty * price;
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'qty': qty,
+    'price': price,
+  };
+
+  factory TransactionItemDetail.fromMap(Map<dynamic, dynamic> map) {
+    return TransactionItemDetail(
+      name: (map['name'] as String?) ?? '',
+      qty: (map['qty'] as num?)?.toInt() ?? 1,
+      price: (map['price'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  @override
+  String toString() => 'TransactionItemDetail(name: $name, qty: $qty, price: $price)';
+}
+
 class TransactionModel extends Equatable {
   final String id;
   final String title;
@@ -11,6 +44,9 @@ class TransactionModel extends Equatable {
   final TransactionType type;
   final String categoryId;
 
+  /// Rincian sub-items (opsional, kosong = transaksi tunggal tanpa detail item)
+  final List<TransactionItemDetail> items;
+
   const TransactionModel({
     required this.id,
     required this.title,
@@ -18,7 +54,10 @@ class TransactionModel extends Equatable {
     required this.date,
     required this.type,
     required this.categoryId,
+    this.items = const [],
   });
+
+  bool get hasItems => items.isNotEmpty;
 
   TransactionModel copyWith({
     String? id,
@@ -27,6 +66,7 @@ class TransactionModel extends Equatable {
     DateTime? date,
     TransactionType? type,
     String? categoryId,
+    List<TransactionItemDetail>? items,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -35,6 +75,7 @@ class TransactionModel extends Equatable {
       date: date ?? this.date,
       type: type ?? this.type,
       categoryId: categoryId ?? this.categoryId,
+      items: items ?? this.items,
     );
   }
 
@@ -46,10 +87,17 @@ class TransactionModel extends Equatable {
       'date': date.toIso8601String(),
       'type': type.name,
       'categoryId': categoryId,
+      'items': items.map((e) => e.toMap()).toList(),
     };
   }
 
   factory TransactionModel.fromMap(Map<String, dynamic> map) {
+    final rawItems = map['items'];
+    final List<TransactionItemDetail> parsedItems = rawItems is List
+        ? rawItems
+              .map((e) => TransactionItemDetail.fromMap(e as Map))
+              .toList()
+        : [];
     return TransactionModel(
       id: map['id'] as String,
       title: map['title'] as String,
@@ -57,11 +105,12 @@ class TransactionModel extends Equatable {
       date: DateTime.parse(map['date'] as String),
       type: TransactionType.values.byName(map['type'] as String),
       categoryId: map['categoryId'] as String,
+      items: parsedItems,
     );
   }
 
   @override
-  List<Object?> get props => [id, title, amount, date, type, categoryId];
+  List<Object?> get props => [id, title, amount, date, type, categoryId, items];
 }
 
 class TransactionModelAdapter extends TypeAdapter<TransactionModel> {
@@ -74,6 +123,16 @@ class TransactionModelAdapter extends TypeAdapter<TransactionModel> {
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
+
+    // Field index 6 = items (List<Map>) — opsional untuk backward-compat
+    final rawItems = fields[6];
+    final List<TransactionItemDetail> items = rawItems is List
+        ? rawItems
+              .whereType<Map>()
+              .map((e) => TransactionItemDetail.fromMap(e))
+              .toList()
+        : [];
+
     return TransactionModel(
       id: fields[0] as String,
       title: fields[1] as String,
@@ -81,13 +140,14 @@ class TransactionModelAdapter extends TypeAdapter<TransactionModel> {
       date: fields[3] as DateTime,
       type: fields[4] as TransactionType,
       categoryId: fields[5] as String,
+      items: items,
     );
   }
 
   @override
   void write(BinaryWriter writer, TransactionModel obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -99,6 +159,9 @@ class TransactionModelAdapter extends TypeAdapter<TransactionModel> {
       ..writeByte(4)
       ..write(obj.type)
       ..writeByte(5)
-      ..write(obj.categoryId);
+      ..write(obj.categoryId)
+      ..writeByte(6)
+      ..write(obj.items.map((e) => e.toMap()).toList());
   }
 }
+
