@@ -55,6 +55,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   // Dynamic item list
   final List<_ItemEntry> _items = [];
 
+  // Saran nama item dari transaksi sebelumnya
+  List<String> _itemNameSuggestions = [];
+
+  // Diskon opsional (hanya untuk pengeluaran)
+  late TextEditingController _discountController;
+  bool _discountEnabled = false;
+
   // OCR state
   final ReceiptScannerService _scannerService = ReceiptScannerService();
   bool _isScanning = false;
@@ -78,6 +85,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
     final edit = widget.transactionToEdit;
     _noteController = TextEditingController();
+    _discountController = TextEditingController(
+      text: (edit != null && edit.discount > 0)
+          ? _ThousandsSeparatorInputFormatter.formatDigits(
+              edit.discount.toStringAsFixed(0),
+            )
+          : '',
+    );
+    _discountEnabled = edit != null && edit.discount > 0;
     _selectedType = edit?.type ?? widget.initialType ?? TransactionType.expense;
     _selectedDate = edit?.date ?? DateTime.now();
 
@@ -144,6 +159,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final categoryProvider = context.read<CategoryProvider>();
       setState(() {
+        _itemNameSuggestions = context
+            .read<TransactionProvider>()
+            .itemNameSuggestions;
         if (edit != null) {
           _selectedCategory = categoryProvider.getCategoryById(edit.categoryId);
         } else if (widget.initialCategory != null) {
@@ -160,6 +178,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   void dispose() {
     _tabController.dispose();
     _noteController.dispose();
+    _discountController.dispose();
     for (final item in _items) {
       item.dispose();
     }
@@ -287,6 +306,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         );
       _scannedImagePath = null;
       _rawOcrText = null;
+      _discountController.clear();
+      _discountEnabled = false;
       _selectedType = initialType;
       _selectedCategory = categories.isNotEmpty ? categories.first : null;
       _selectedDate = DateTime.now();
@@ -294,7 +315,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     _tabController.animateTo(index);
   }
 
-  double get _totalAmount {
+  /// Total kotor seluruh item sebelum diskon
+  double get _grossAmount {
     double total = 0;
     for (final item in _items) {
       final qty = int.tryParse(item.qtyController.text) ?? 1;
@@ -308,9 +330,28 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     return total;
   }
 
+  /// Nominal diskon yang aktif (0 bila tombol diskon belum ditekan)
+  double get _discountAmount {
+    if (!_discountEnabled || !_selectedType.isExpense) return 0;
+    return double.tryParse(
+          _discountController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+        ) ??
+        0;
+  }
+
+  /// Total bersih setelah diskon
+  double get _totalAmount {
+    final net = _grossAmount - _discountAmount;
+    return net < 0 ? 0 : net;
+  }
+
   void _onTypeChanged(TransactionType newType) {
     setState(() {
       _selectedType = newType;
+      if (!newType.isExpense) {
+        _discountEnabled = false;
+        _discountController.clear();
+      }
       final categoryProvider = context.read<CategoryProvider>();
       final available = categoryProvider.getCategoriesByType(newType);
       if (_selectedCategory == null ||
@@ -466,6 +507,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
     // Filter dan parsing setiap baris item dari Daftar Item
     final note = _noteController.text.trim();
+    final discount = _discountAmount;
     final itemsToSave = <({String title, double amount, int qty})>[];
 
     for (var i = 0; i < _items.length; i++) {
@@ -525,13 +567,23 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       return;
     }
 
+    final grossAmount = itemsToSave.fold(0.0, (s, e) => s + e.amount);
+    if (discount > grossAmount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Diskon tidak boleh melebihi total item!'),
+        ),
+      );
+      return;
+    }
+
     final txProvider = context.read<TransactionProvider>();
     final isEditing = widget.transactionToEdit != null;
 
     bool ok = false;
     if (isEditing) {
       // Saat edit: perbarui transaksi yang ada dengan semua item sebagai sub-items
-      final totalAmount = itemsToSave.fold(0.0, (s, e) => s + e.amount);
+      final totalAmount = grossAmount - discount;
       final headerTitle = note.isNotEmpty
           ? note
           : itemsToSave.map((e) => e.title).join(', ');
@@ -551,6 +603,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         type: _selectedType,
         categoryId: _selectedCategory!.id,
         items: subItems,
+        discount: discount,
       );
       ok = await txProvider.updateTransaction(updated);
     } else {
@@ -561,6 +614,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         type: _selectedType,
         categoryId: _selectedCategory!.id,
         note: note.isNotEmpty ? note : null,
+        discount: discount,
       );
     }
 
@@ -693,7 +747,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
                     // ─── Tombol Tambah Item ───
                     _buildAddItemButton(primary),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
+
+                    // ─── Diskon (opsional, khusus pengeluaran) ───
+                    if (_selectedType.isExpense) ...[
+                      _buildDiscountSection(primary, isDark),
+                      const SizedBox(height: 8),
+                    ],
+                    const SizedBox(height: 8),
 
                     // ─── Kategori & Tanggal ───
                     _buildCategorySelector(
@@ -1212,26 +1273,85 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             ),
             const SizedBox(height: 10),
 
-            // Nama Item
-            TextField(
-              controller: item.nameController,
-              decoration: InputDecoration(
-                labelText: 'Nama Item',
-                hintText: 'Contoh: Mie Goreng, Kopi, dll.',
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: isDark
-                    ? const Color(0xFF0F172A)
-                    : Colors.grey.shade50,
-              ),
-              style: const TextStyle(fontSize: 14),
+            // Nama Item — dengan saran dari item yang pernah dicatat
+            RawAutocomplete<String>(
+              textEditingController: item.nameController,
+              focusNode: item.nameFocusNode,
+              optionsBuilder: (textEditingValue) {
+                final query = textEditingValue.text.trim().toLowerCase();
+                if (_itemNameSuggestions.isEmpty) {
+                  return const Iterable<String>.empty();
+                }
+                final matches = _itemNameSuggestions.where(
+                  (name) =>
+                      query.isEmpty || name.toLowerCase().contains(query),
+                );
+                return matches.take(6);
+              },
+              onSelected: (_) => setState(() {}),
+              fieldViewBuilder:
+                  (context, controller, focusNode, onFieldSubmitted) {
+                    return TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      onSubmitted: (_) => onFieldSubmitted(),
+                      decoration: InputDecoration(
+                        labelText: 'Nama Item',
+                        hintText: 'Contoh: Mie Goreng, Kopi, dll.',
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: isDark
+                            ? const Color(0xFF0F172A)
+                            : Colors.grey.shade50,
+                      ),
+                      style: const TextStyle(fontSize: 14),
+                    );
+                  },
+              optionsViewBuilder: (context, onSelected, options) {
+                final optionList = options.toList();
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    elevation: 6,
+                    borderRadius: BorderRadius.circular(12),
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxHeight: 220,
+                        maxWidth: 320,
+                      ),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: optionList.length,
+                        itemBuilder: (context, index) {
+                          final option = optionList[index];
+                          return ListTile(
+                            dense: true,
+                            leading: Icon(
+                              Icons.history_rounded,
+                              size: 18,
+                              color: primary,
+                            ),
+                            title: Text(
+                              option,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            onTap: () => onSelected(option),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 10),
 
@@ -1354,6 +1474,93 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     );
   }
 
+  Widget _buildDiscountSection(Color primary, bool isDark) {
+    if (!_discountEnabled) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => setState(() => _discountEnabled = true),
+          icon: Icon(Icons.local_offer_rounded, color: primary, size: 18),
+          label: Text(
+            'Ada diskon? Tambahkan',
+            style: TextStyle(
+              color: primary,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: primary.withValues(alpha: 0.3)),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _discountController,
+              keyboardType: TextInputType.number,
+              inputFormatters: const [_ThousandsSeparatorInputFormatter()],
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'Diskon (Opsional)',
+                hintText: '0',
+                prefixText: 'Rp ',
+                prefixIcon: Icon(
+                  Icons.local_offer_rounded,
+                  color: primary,
+                  size: 20,
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: isDark
+                    ? const Color(0xFF0F172A)
+                    : Colors.grey.shade50,
+              ),
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Hapus diskon',
+            onPressed: () => setState(() {
+              _discountEnabled = false;
+              _discountController.clear();
+            }),
+            icon: Icon(
+              Icons.close_rounded,
+              color: Colors.red.shade400,
+              size: 20,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCategorySelector(
     List<CategoryModel> availableCategories,
     Color primary,
@@ -1416,6 +1623,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
   Widget _buildTotalCard(Color primary, bool isDark) {
     final total = _totalAmount;
+    final gross = _grossAmount;
+    final discount = _discountAmount;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -1449,6 +1658,26 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             ),
           ),
           const SizedBox(height: 6),
+          if (discount > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Subtotal: ${CurrencyHelper.formatRupiah(gross)}',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.75),
+                fontSize: 12,
+                decoration: TextDecoration.lineThrough,
+              ),
+            ),
+            Text(
+              'Diskon: -${CurrencyHelper.formatRupiah(discount)}',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.85),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+          ],
           Text(
             CurrencyHelper.formatRupiah(total),
             style: const TextStyle(
@@ -1508,17 +1737,19 @@ class _ItemEntry {
   final TextEditingController nameController;
   final TextEditingController qtyController;
   final TextEditingController priceController;
+  final FocusNode nameFocusNode;
 
   _ItemEntry({
     required this.nameController,
     required this.qtyController,
     required this.priceController,
-  });
+  }) : nameFocusNode = FocusNode();
 
   void dispose() {
     nameController.dispose();
     qtyController.dispose();
     priceController.dispose();
+    nameFocusNode.dispose();
   }
 }
 

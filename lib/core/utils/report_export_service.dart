@@ -12,12 +12,31 @@ import '../../data/models/transaction_model.dart';
 import '../../data/models/transaction_type.dart';
 
 class ReportExportService {
+  /// Ringkas rincian sub-item untuk laporan.
+  static String _formatItems(TransactionModel tx) {
+    if (!tx.hasItems) return '-';
+    return tx.items
+        .map(
+          (item) =>
+              '${item.name} (${item.qty}x @${item.price.toStringAsFixed(0)})',
+        )
+        .join('; ');
+  }
+
   static String generateCsv(
     List<TransactionModel> transactions, {
     DateTimeRange? dateRange,
   }) {
     final rows = <List<String>>[
-      ['Tanggal', 'Judul', 'Jenis', 'Nominal'],
+      [
+        'Tanggal',
+        'Judul',
+        'Jenis',
+        'Rincian Item',
+        'Subtotal',
+        'Diskon',
+        'Nominal',
+      ],
     ];
 
     for (final tx in transactions) {
@@ -25,6 +44,9 @@ class ReportExportService {
         DateFormat('yyyy-MM-dd', 'id_ID').format(tx.date),
         tx.title,
         tx.type == TransactionType.income ? 'Pemasukan' : 'Pengeluaran',
+        _formatItems(tx),
+        tx.grossAmount.toStringAsFixed(2),
+        tx.discount.toStringAsFixed(2),
         tx.amount.toStringAsFixed(2),
       ]);
     }
@@ -35,13 +57,45 @@ class ReportExportService {
     final totalExpense = transactions
         .where((tx) => tx.type == TransactionType.expense)
         .fold(0.0, (sum, tx) => sum + tx.amount);
+    final totalDiscount = transactions
+        .where((tx) => tx.type == TransactionType.expense)
+        .fold(0.0, (sum, tx) => sum + tx.discount);
 
-    rows.add(['', '', 'Total Pemasukan', totalIncome.toStringAsFixed(2)]);
-    rows.add(['', '', 'Total Pengeluaran', totalExpense.toStringAsFixed(2)]);
+    rows.add(['', '', '', '', '', '', '']);
+    rows.add([
+      '',
+      '',
+      'Total Pemasukan',
+      '',
+      '',
+      '',
+      totalIncome.toStringAsFixed(2),
+    ]);
+    rows.add([
+      '',
+      '',
+      'Total Pengeluaran',
+      '',
+      '',
+      '',
+      totalExpense.toStringAsFixed(2),
+    ]);
+    rows.add([
+      '',
+      '',
+      'Total Diskon',
+      '',
+      '',
+      '',
+      totalDiscount.toStringAsFixed(2),
+    ]);
     rows.add([
       '',
       '',
       'Saldo',
+      '',
+      '',
+      '',
       (totalIncome - totalExpense).toStringAsFixed(2),
     ]);
 
@@ -50,6 +104,9 @@ class ReportExportService {
         '',
         '',
         'Periode',
+        '',
+        '',
+        '',
         '${DateFormat('dd/MM/yyyy', 'id_ID').format(dateRange.start)} - ${DateFormat('dd/MM/yyyy', 'id_ID').format(dateRange.end)}',
       ]);
     }
@@ -85,6 +142,9 @@ class ReportExportService {
     final totalExpense = transactions
         .where((tx) => tx.type == TransactionType.expense)
         .fold(0.0, (sum, tx) => sum + tx.amount);
+    final totalDiscount = transactions
+        .where((tx) => tx.type == TransactionType.expense)
+        .fold(0.0, (sum, tx) => sum + tx.discount);
 
     pdf.addPage(
       pw.Page(
@@ -98,6 +158,15 @@ class ReportExportService {
                   tx.type == TransactionType.income
                       ? 'Pemasukan'
                       : 'Pengeluaran',
+                  _formatItems(tx),
+                  NumberFormat.currency(
+                    locale: 'id_ID',
+                    symbol: 'Rp ',
+                    decimalDigits: 0,
+                  ).format(tx.grossAmount),
+                  tx.discount > 0
+                      ? '-${NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(tx.discount)}'
+                      : '-',
                   NumberFormat.currency(
                     locale: 'id_ID',
                     symbol: 'Rp ',
@@ -124,12 +193,33 @@ class ReportExportService {
                     : '${DateFormat('dd/MM/yyyy', 'id_ID').format(dateRange.start)} - ${DateFormat('dd/MM/yyyy', 'id_ID').format(dateRange.end)}',
               ),
               pw.SizedBox(height: 20),
-              pw.Table.fromTextArray(
-                headers: ['Tanggal', 'Judul', 'Jenis', 'Nominal'],
+              pw.TableHelper.fromTextArray(
+                headers: [
+                  'Tanggal',
+                  'Judul',
+                  'Jenis',
+                  'Rincian Item',
+                  'Subtotal',
+                  'Diskon',
+                  'Nominal',
+                ],
                 data: rows,
                 border: null,
-                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                headerStyle: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+                cellStyle: const pw.TextStyle(fontSize: 8),
                 cellAlignment: pw.Alignment.centerLeft,
+                columnWidths: {
+                  0: const pw.FixedColumnWidth(52),
+                  1: const pw.FlexColumnWidth(2),
+                  2: const pw.FixedColumnWidth(52),
+                  3: const pw.FlexColumnWidth(3),
+                  4: const pw.FixedColumnWidth(58),
+                  5: const pw.FixedColumnWidth(52),
+                  6: const pw.FixedColumnWidth(58),
+                },
               ),
               pw.SizedBox(height: 20),
               pw.Row(
@@ -145,6 +235,10 @@ class ReportExportService {
                     ),
                   ),
                 ],
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'Total Diskon: ${NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(totalDiscount)}',
               ),
               pw.SizedBox(height: 8),
               pw.Text(

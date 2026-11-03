@@ -47,6 +47,10 @@ class TransactionModel extends Equatable {
   /// Rincian sub-items (opsional, kosong = transaksi tunggal tanpa detail item)
   final List<TransactionItemDetail> items;
 
+  /// Potongan diskon (opsional, hanya dipakai untuk pengeluaran).
+  /// Nilai `amount` sudah merupakan nominal bersih setelah diskon.
+  final double discount;
+
   const TransactionModel({
     required this.id,
     required this.title,
@@ -55,9 +59,15 @@ class TransactionModel extends Equatable {
     required this.type,
     required this.categoryId,
     this.items = const [],
+    this.discount = 0,
   });
 
   bool get hasItems => items.isNotEmpty;
+
+  bool get hasDiscount => discount > 0;
+
+  /// Total kotor sebelum diskon
+  double get grossAmount => amount + discount;
 
   TransactionModel copyWith({
     String? id,
@@ -67,6 +77,7 @@ class TransactionModel extends Equatable {
     TransactionType? type,
     String? categoryId,
     List<TransactionItemDetail>? items,
+    double? discount,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -76,6 +87,7 @@ class TransactionModel extends Equatable {
       type: type ?? this.type,
       categoryId: categoryId ?? this.categoryId,
       items: items ?? this.items,
+      discount: discount ?? this.discount,
     );
   }
 
@@ -88,6 +100,7 @@ class TransactionModel extends Equatable {
       'type': type.name,
       'categoryId': categoryId,
       'items': items.map((e) => e.toMap()).toList(),
+      'discount': discount,
     };
   }
 
@@ -106,11 +119,21 @@ class TransactionModel extends Equatable {
       type: TransactionType.values.byName(map['type'] as String),
       categoryId: map['categoryId'] as String,
       items: parsedItems,
+      discount: (map['discount'] as num?)?.toDouble() ?? 0,
     );
   }
 
   @override
-  List<Object?> get props => [id, title, amount, date, type, categoryId, items];
+  List<Object?> get props => [
+    id,
+    title,
+    amount,
+    date,
+    type,
+    categoryId,
+    items,
+    discount,
+  ];
 }
 
 class TransactionModelAdapter extends TypeAdapter<TransactionModel> {
@@ -141,13 +164,14 @@ class TransactionModelAdapter extends TypeAdapter<TransactionModel> {
       type: fields[4] as TransactionType,
       categoryId: fields[5] as String,
       items: items,
+      discount: (fields[7] as num?)?.toDouble() ?? 0,
     );
   }
 
   @override
   void write(BinaryWriter writer, TransactionModel obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -161,7 +185,9 @@ class TransactionModelAdapter extends TypeAdapter<TransactionModel> {
       ..writeByte(5)
       ..write(obj.categoryId)
       ..writeByte(6)
-      ..write(obj.items.map((e) => e.toMap()).toList());
+      ..write(obj.items.map((e) => e.toMap()).toList())
+      ..writeByte(7)
+      ..write(obj.discount);
   }
 }
 

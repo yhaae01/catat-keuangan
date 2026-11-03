@@ -221,11 +221,13 @@ class TransactionProvider extends ChangeNotifier {
     required TransactionType type,
     required String categoryId,
     String? note,
+    double discount = 0,
   }) async {
     if (items.isEmpty) return true;
 
-    // Hitung total dari semua item
-    final double totalAmount = items.fold(0.0, (sum, e) => sum + e.amount);
+    // Hitung total dari semua item, lalu kurangi diskon (jika ada)
+    final double grossAmount = items.fold(0.0, (sum, e) => sum + e.amount);
+    final double totalAmount = (grossAmount - discount).clamp(0.0, grossAmount);
 
     // Buat daftar sub-item
     final subItems = items
@@ -251,6 +253,7 @@ class TransactionProvider extends ChangeNotifier {
       type: type,
       categoryId: categoryId,
       items: subItems,
+      discount: discount.clamp(0.0, grossAmount),
     );
   }
 
@@ -262,6 +265,7 @@ class TransactionProvider extends ChangeNotifier {
     required TransactionType type,
     required String categoryId,
     List<TransactionItemDetail> items = const [],
+    double discount = 0,
   }) async {
     final newTx = TransactionModel(
       id: _uuid.v4(),
@@ -271,6 +275,7 @@ class TransactionProvider extends ChangeNotifier {
       type: type,
       categoryId: categoryId,
       items: items,
+      discount: discount,
     );
     return addTransactions([newTx]);
   }
@@ -315,6 +320,30 @@ class TransactionProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Daftar nama item yang pernah dicatat, untuk saran (autocomplete)
+  /// saat mengisi nama sub-item baru. Nama terbaru muncul lebih dulu.
+  List<String> get itemNameSuggestions {
+    final seen = <String>{};
+    final suggestions = <String>[];
+
+    for (final tx in _transactions) {
+      final names = tx.hasItems
+          ? tx.items.map((item) => item.name)
+          : [tx.title];
+
+      for (final rawName in names) {
+        final name = rawName.trim();
+        if (name.isEmpty) continue;
+        final key = name.toLowerCase();
+        if (seen.add(key)) {
+          suggestions.add(name);
+        }
+      }
+    }
+
+    return suggestions;
   }
 
   /// Mendapatkan transaksi berdasarkan kategori
